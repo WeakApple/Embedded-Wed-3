@@ -19,6 +19,9 @@ irqreturn_t irq_handler(int irq, void *dev_id){
     switch (irq)
     {
         case 59:
+            timer_setup(&timer, timer_cb, 0);
+            timer.expires = jiffies + HZ * 2;
+            add_timer(&timer);
         break;
         case 60:
         break;
@@ -29,6 +32,28 @@ irqreturn_t irq_handler(int irq, void *dev_id){
     }
     return 0;
 }
+
+
+static void timer_cb(struct timer_list *timer) {
+    int ret, i;
+    printk(KERN_INFO "timer callback function!\n");
+
+    if(flag == 0) {
+        for(i = 0; i < 4; i++) {
+            ret = gpio_direction_output(led[i], HIGH);
+        }
+        flag = 1;
+    } else {
+        for(i = 0; i < 4; i++) {
+            ret = gpio_direction_output(led[i], LOW);
+        }
+        flag = 0;
+    }
+
+    timer->expires = jiffies + HZ * 2;
+    add_timer(timer);
+}
+
 
 static int switch_interrupt_init(void){
     int rsw, rled,i;
@@ -60,6 +85,8 @@ static void switch_interrupt_exit(void){
         gpio_free(led[i]);
     }
 }
+
+
 
 module_init(switch_interrupt_init);
 module_exit(switch_interrupt_exit);
