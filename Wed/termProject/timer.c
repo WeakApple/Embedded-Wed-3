@@ -41,6 +41,7 @@ static void timer_cb(struct timer_list * timer) {
 
 
 irqreturn_t irq_handler(int irq, void*dev_id) {
+    int i;
     printk(KERN_INFO"Debug%d\n", irq);
     switch(irq) {
         case 60:
@@ -49,15 +50,15 @@ irqreturn_t irq_handler(int irq, void*dev_id) {
             }
             else{
                 del_timer_sync(&timer)
-                for (int i = 0; i < 4; i++) {
-                    gpio_set_value(led[i], LOW); // LED 끄기
+                for (i = 0; i < 4; i++) {
+                    gpio_direction_output(led[i], LOW); // LED 끄기
                 }
             }
 
             timer_setup(&timer, timer_cb, 0);
             timer.expires = jiffies + HZ * 2;
             add_timer(&timer);
-            mode = 1
+            mode = 1;
             break;
         case 62:
             printk(KERN_INFO"sw2 interrupt ocurred!\n");
@@ -68,10 +69,10 @@ irqreturn_t irq_handler(int irq, void*dev_id) {
         case 63:
             printk(KERN_INFO"sw4 interrupt ocurred!\n");
             del_timer_sync(&timer)
-            for (int i = 0; i < 4; i++) {
-                gpio_set_value(led[i], LOW); // LED 끄기
+            for (i = 0; i < 4; i++) {
+                gpio_direction_output(led[i], LOW); // LED 끄기
             }
-            mode = 0
+            mode = 0;
             break;
     }
     return 0;
