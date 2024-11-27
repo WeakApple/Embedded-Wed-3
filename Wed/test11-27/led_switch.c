@@ -17,7 +17,7 @@ static int sw[4] = {4, 17, 27, 22};
 // 상태 변수
 static int mode = 0; // 현재 모드
 static struct timer_list led_timer;
-static unsigned char led_state[4] = {0}; // 각 LED의 켜짐 꺼짐 상태를 저장
+static unsigned char led_state[4] = {0};
 static int current_led = 0; // 개별 모드에서 현재 LED
 
 // 리셋 모드
@@ -97,7 +97,7 @@ static ssize_t led_switch_write(struct file *file, const char __user *buf, size_
             mode_two();
             break;
         case '3':
-            mode = 3;
+            mode_three(user_input);
             break;
         case '4':
             reset_mode();
