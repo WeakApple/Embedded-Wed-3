@@ -1,140 +1,205 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/interrupt.h>
-#include <linux/delay.h>
+#include <linux/fs.h>
 #include <linux/gpio.h>
+#include <linux/uaccess.h>
+#include <linux/interrupt.h>
 #include <linux/timer.h>
 
-#define HIGH    1
-#define LOW     0
+#define DEV_NAME "led_switch"
+#define DEV_MAJOR_NUMBER 220
 
-int sw[4] = {4, 17, 27, 22};
-int led[4] = {23, 24, 25, 1}
-int mode = 3; // mode 0 ~ 2번까지 
+// GPIO 설정
+static int led[4] = {23, 24, 25, 1};
+static int sw[4] = {4, 17, 27, 22};
 
-static struct timer_list timer;
+// 상태 변수
+static int mode = 0; // 현재 모드
+static struct timer_list led_timer;
+static unsigned char led_state[4] = {0};
+static int current_led = 0; // 개별 모드에서 현재 LED
 
-static void timer_cb_sw0(struct timer_list * timer) {
-    int flag = 0;
-    int ret_led, i;
-
-    if (flag == 0) {
-        for(i = 0; i < 4; i++) {
-            ret_led = gpio_direction_output(led[i], HIGH);
-        }
-        flag = 1;
-    } else {
-        for(i = 0; i < 4; i++) {
-            ret_led = gpio_direction_output(led[i], LOW);
-        }
-        flag = 0;
-    }
-
-    timer->expires = jiffies + HZ * 2;
-    add_timer(timer);
-
-}
-
-static void timer_cb_sw1(struct timer_list * timer) {
-    int ret_led, i;
-    
-    for(i = 0; i < 4; i++) {
-        ret_led = gpio_direction_output(led[i], HIGH);
-        timer->expires = jiffies + HZ * 2;
-        ret_led = gpio_direction_output(led[i], LOW);
-    }
-    add_timer(timer);
-
-}
-
-static void timer_cb_sw2(struct timer_list * timer) {
-    int ret_led, i;
-    char read_buf[4];
-
-    for(i = 0; i < 4; i++) {
-        if (gpio_get_value(sw[i])) {
-            
-        }
-        read_buf[i] = gpio_get_value(sw[i]);
-    }
-    ret = copy_to_user(buf, read_buf, sizeof(read_buf));
-
-
-    
-    add_timer(timer);
-
-}
-
-
-
-
-irqreturn_t irq_handler(int irq, void*dev_id) {
-    printk(KERN_INFO"Debug%d\n", irq);
-
-    switch(irq) {
-        case 61:
-            if (mode == 0) :
-                break;
-            timer_setup(&timer, timer_cb_sw0, 0);
-            timer.expires = jiffies + HZ * 2;
-            add_timer(&timer);
-            mode = 0;
-            break;
-        case 62:
-            if (mode == 1) :
-                break;
-            timer_setup(&timer, timer_cb_sw1, 0);
-            timer.expires = jiffies + HZ * 2;
-            add_timer(&timer);
-            mode = 1;
-            break;
-        case 63:
-            if (mode == 3) :
-                break;
-            timer_setup(&timer, timer_cb_sw2, 0);
-
-
-        case 64:
-            printk(KERN_INFO"sw4 dinterrupt ocurred!\n");
-            break;
-    }
-    return 0;
-}
-
-static int led_switch_init(void) {
-    int res_sw, ret_led, i;
-    printk(KERN_INFO"led_switch_init!\n");
-
-    for(i = 0; i < 4; i++) {
-        res_sw = gpio_request(sw[i], "sw");
-        ret_led = gpio_request(led[i], "LED");
-
-        res_sw = request_irq(gpio_to_irq(sw[i]), (irq_handler_t)irq_handler,IRQF_TRIGGER_RISING, "IRQ", (void *)(irq_handler));
-        
-        if (res_sw < 0)
-            printk(KERN_INFO"requset_irq failed!\n");
-        if (ret_led < 0)
-            printk(KERN_INFO "led_module gpio_request failed!\n");
-    
-    }
-    return 0;
-}
-
-static void led_switch_exit(void) {
+// 리셋 모드
+void reset_mode(void) {
     int i;
+    del_timer_sync(&led_timer);
+    mode = 0;
+    for (i = 0; i < 4; i++) {
+        gpio_direction_output(led[i], 0);
+        led_state[i] = 0;
+    }
+    printk(KERN_INFO "Reset mode activated\n");
+}
 
-    printk(KERN_INFO "led_switch_exit\n");
+// 전체 모드
+void mode_one(void) {
+    mode = 1;
+    mod_timer(&led_timer, jiffies + HZ * 2);
+    printk(KERN_INFO "All LEDs blink mode activated\n");
+}
 
-    del_timer(&timer);
+// 개별 모드
+void mode_two(void) {
+    mode = 2;
+    mod_timer(&led_timer, jiffies + HZ * 2);
+    printk(KERN_INFO "Sequential LED blink mode activated\n");
+}
 
-    for(i = 0; i < 4; i++) {
+// 수동 모드
+void mode_three(int idx) {
+    led_state[idx] ^= 1;
+    gpio_direction_output(led[idx], led_state[idx]);
+    printk(KERN_INFO "Manual mode: LED %d toggled\n", idx);
+}
+
+// 타이머 콜백 함수
+void led_timer_callback(struct timer_list *t) {
+    int i;
+    if (mode == 1) { // 전체 모드
+        for (i = 0; i < 4; i++) {
+            gpio_direction_output(led[i], led_state[0]);
+        }
+        led_state[0] ^= 1;
+    } else if (mode == 2) { // 개별 모드
+        for (i = 0; i < 4; i++) {
+            gpio_direction_output(led[i], i == current_led ? 1 : 0);
+        }
+        current_led = (current_led + 1) % 4;
+    }
+
+    if (mode == 1 || mode == 2) {
+        mod_timer(&led_timer, jiffies + HZ * 2);
+    }
+}
+
+// 사용자로부터 입력받는 write 함수
+static ssize_t led_switch_write(struct file *file, const char __user *buf, size_t len, loff_t *offset) {
+    char user_input;
+
+    if (copy_from_user(&user_input, buf, 1)) {
+        return -EFAULT;
+    }
+
+    if (mode == 3) {
+        if (user_input == '4') {
+            reset_mode();
+        }else{
+            int idx = (int)user_input;
+            mode_three(idx);
+        }
+    }else{
+        reset_mode();
+        switch (user_input) {
+        case '1':
+            mode_one();
+            break;
+        case '2':
+            mode_two();
+            break;
+        case '3':
+            mode = 3;
+            break;
+        case '4':
+            reset_mode();
+            // printk(KERN_INFO "Manual mode activated\n");
+            break;
+        default:
+            printk(KERN_INFO "Invalid input received: %c\n", user_input);
+            break;
+    }
+
+    }
+    return len;
+}
+
+// 인터럽트 핸들러
+irqreturn_t irq_handler(int irq, void *dev_id) {
+    int i;
+    
+    if (mode != 3){
+        reset_mode();
+    }
+
+    for (i = 0; i < 4; i++) {
+        if (irq == gpio_to_irq(sw[i])) {
+            if (mode == 3){
+                reset_mode();
+                for (i = 0; i < 4; i++) {
+                    if (irq == gpio_to_irq(sw[i])) {
+                        led_state[i] ^= 1;
+                        gpio_direction_output(led[i], led_state[i]);
+                        printk(KERN_INFO "sibal");
+                      
+                    }
+                    
+                }
+                
+                if (i == 3){
+                    reset_mode();
+                }else{
+                    mode_three(i);
+                }
+                
+            }else{
+                switch (i) {
+                    case 0: mode_one(); break;
+                    case 1: mode_two(); break;
+                    case 2: mode = 3; break;
+                    case 3: reset_mode(); break;
+                }
+            }
+            
+            return IRQ_HANDLED;
+        }
+    }
+    return IRQ_NONE;
+}
+
+// 파일 연산 구조체
+static struct file_operations fops = {
+    .owner = THIS_MODULE,
+    .write = led_switch_write, // write 함수 추가
+};
+
+// 디바이스 드라이버 초기화
+static int __init led_switch_init(void) {
+    int i, ret;
+
+    for (i = 0; i < 4; i++) {
+        if ((ret = gpio_request(led[i], "LED")) < 0) return ret;
+        if ((ret = gpio_request(sw[i], "SW")) < 0) return ret;
+
+        if ((ret = request_irq(gpio_to_irq(sw[i]), irq_handler, IRQF_TRIGGER_RISING, "switch_irq", NULL)) < 0) return ret;
+    }
+
+    timer_setup(&led_timer, led_timer_callback, 0);
+
+    if ((ret = register_chrdev(DEV_MAJOR_NUMBER, DEV_NAME, &fops)) < 0) {
+        printk(KERN_ERR "Failed to register char device\n");
+        return ret;
+    }
+
+    printk(KERN_INFO "LED Switch Driver Initialized\n");
+    return 0;
+}
+
+// 디바이스 드라이버 종료
+static void __exit led_switch_exit(void) {
+    int i;
+    del_timer_sync(&led_timer);
+    for (i = 0; i < 4; i++) {
+        free_irq(gpio_to_irq(sw[i]), NULL);
         gpio_free(led[i]);
-        free_irq(gpio_to_irq(sw[i]), (void *)(irq_handler));
         gpio_free(sw[i]);
     }
+    unregister_chrdev(DEV_MAJOR_NUMBER, DEV_NAME);
+    printk(KERN_INFO "LED Switch Driver Removed\n");
 }
 
 module_init(led_switch_init);
 module_exit(led_switch_exit);
+
 MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Your Name");
+MODULE_DESCRIPTION("LED Switch Driver");
