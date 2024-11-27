@@ -30,11 +30,11 @@ void led_timer_callback(struct timer_list *t) {
         }
         led_state[0] ^= 1; // 상태 반전
     } else if (mode == 2) { // 개별 모드
-        static int current = 0;
+        static int current_led = 0;
         for (i = 0; i < 4; i++) {
-            gpio_direction_output(led[i], i == current ? 1 : 0);
+            gpio_direction_output(led[i], i == current_led ? 1 : 0);
         }
-        current = (current + 1) % 4;
+        current_led = (current_led + 1) % 4;
     }
 
     if (mode == 1 || mode == 2) {
@@ -45,6 +45,7 @@ void led_timer_callback(struct timer_list *t) {
 // 인터럽트 핸들러
 irqreturn_t irq_handler(int irq, void *dev_id) {
     int i;
+    int j;
 
     for (i = 0; i < 4; i++) {
         if (irq == gpio_to_irq(sw[i])) {
@@ -62,7 +63,7 @@ irqreturn_t irq_handler(int irq, void *dev_id) {
             } else if (i == 3) {
                 mode = 0; // 리셋 모드
                 del_timer_sync(&led_timer);
-                for (int j = 0; j < 4; j++) {
+                for (j = 0; j < 4; j++) {
                     gpio_direction_output(led[j], 0);
                 }
             }
