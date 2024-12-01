@@ -129,7 +129,7 @@ irqreturn_t irq_handler(int irq, void *dev_id) {
                     if (irq == gpio_to_irq(sw[i])) {
                         led_state[i] ^= 1;
                         gpio_direction_output(led[i], led_state[i]);
-                        printk(KERN_INFO "sibal");
+                        printk(KERN_INFO "asdf");
                       
                     }
                     
