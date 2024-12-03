@@ -5,6 +5,7 @@
 #include <linux/delay.h>
 #include <linux/gpio.h>
 #include <linux/timer.h>
+#include <linux/delay.h>
 #include <linux/fs.h>
 #include <linux/uaccess.h>
 
@@ -12,20 +13,20 @@
 #define HIGH    1
 #define LOW     0
 
-#define DEV_NAME "led_switch"
+#define DEVICE_NAME "led_switch"
 #define DEV_MAJOR_NUMBER 220
-
-
 
 
 int sw[4] = {4, 17, 27, 22};
 int led[4] = {23, 24, 25, 1};
-int mode = 3; // mode 0 ~ 3번까지 
+int mode = 5; // mode 0 ~ 3번까지 
+static int led_state[4] = {0, 0, 0, 0};
+static int current_led = 3;
 
 static struct timer_list timer;
 
 static void timer_cb_sw0(struct timer_list * timer) {
-    int flag = 0;
+    static int flag = 0;
     int ret_led, i;
 
     if (flag == 0) {
@@ -33,11 +34,15 @@ static void timer_cb_sw0(struct timer_list * timer) {
             ret_led = gpio_direction_output(led[i], HIGH);
         }
         flag = 1;
-    } else {
+        
+        
+        } else {
         for(i = 0; i < 4; i++) {
             ret_led = gpio_direction_output(led[i], LOW);
         }
         flag = 0;
+        
+        
     }
 
     timer->expires = jiffies + HZ * 2;
@@ -47,49 +52,47 @@ static void timer_cb_sw0(struct timer_list * timer) {
 
 static void timer_cb_sw1(struct timer_list * timer) {
     
-
-    // int ret_led, i;
-    
-    // for(i = 0; i < 4; i++) {
-    //     ret_led = gpio_direction_output(led[i], HIGH);
-    //     timer->expires = jiffies + HZ * 2;
-    //     ret_led = gpio_direction_output(led[i], LOW);
-    //     add_timer(timer);
-    // }
-
-    
-    static int current_led = 0;
     int ret_led;
 
-    
-    ret_led = gpio_direction_output(led[current_led], HIGH);
-
-    
-    timer->expires = jiffies + HZ * 2; 
-    add_timer(timer);
-    
-    
     ret_led = gpio_direction_output(led[current_led], LOW);
-
     
+    
+    printk(KERN_INFO "LED OFF %d", current_led);
+
     current_led = (current_led + 1) % 4;
 
+    timer->expires = jiffies + HZ * 2;
+    add_timer(timer);
+
+    ret_led = gpio_direction_output(led[current_led], HIGH);
+    printk(KERN_INFO "LED ON %d", current_led);
 }
 
+static void reset_mode(int number) {
+    int i;
+    mode = 5;
+    del_timer_sync(&timer);
+    for(i = 0; i < 4; i++) {
+        gpio_direction_output(led[i], LOW);
+    }
+    printk(KERN_INFO "RESET_MODE");
+}
 
 
 
 irqreturn_t irq_handler(int irq, void*dev_id) {
     printk(KERN_INFO"Debug%d\n", irq);
-    int led_state[4] = {0};
+    
+    int i;
 
     switch(irq) {
-        case 61:
+        case 60:
 
             if (mode == 0) {
+                reset_mode(0);
                 break;
             }
-            if (mode != 3) {
+            if (mode != 2) {
                 timer_setup(&timer, timer_cb_sw0, 0);
                 timer.expires = jiffies + HZ * 2;
                 add_timer(&timer);
@@ -98,12 +101,13 @@ irqreturn_t irq_handler(int irq, void*dev_id) {
             }
             break;
 
-        case 62:
+        case 61:
 
             if (mode == 1) {
+                reset_mode(1);
                 break;
             }
-            if (mode != 3) {
+            if (mode != 2) {
                 timer_setup(&timer, timer_cb_sw1, 0);
                 timer.expires = jiffies + HZ * 2;
                 add_timer(&timer);
@@ -112,56 +116,110 @@ irqreturn_t irq_handler(int irq, void*dev_id) {
             }
             break;
 
-        case 63:
+        case 62:
 
             if (mode == 2) {
+                reset_mode(2);
                 break;
             }
             
-            if (mode != 3) {
+            if (mode != 2) {
+                mode = 2;
+                while (1) {
+                    msleep(20);
+                    for (i = 0; i < 4; i++) {
+                        if(gpio_get_value(sw[i])) {
+                            if(i == 3) {
+                                reset_mode(3);
+                                return IRQ_HANDLED;
+                            }
+                            led_state[i] ^= 1;
+                            gpio_direction_output(led[i], led_state[i] ? HIGH : LOW);
+                            printk(KERN_INFO "press\n");
 
-                if (gpio_get_value(sw[0])) {
-                    led_state[0] ^= 1; 
-                    gpio_direction_output(led[0], led_state[0]);
-                }
 
-            
-                if (gpio_get_value(sw[1])) {
-                    led_state[1] ^= 1; 
-                    gpio_direction_output(led[1], led_state[1]);   
-                }
-
-                
-                if (gpio_get_value(sw[2])) {
-                    led_state[2] ^= 1; 
-                    gpio_direction_output(led[2], led_state[2]); 
-                }
-
-                
-                if (gpio_get_value(sw[3])) {
-                    for (int i = 0; i < 4; i++) {
-                        led_state[i] = 0;
-                        gpio_direction_output(led[i], LOW); 
+                        }
                     }
-                    mode = 3;
+
+                    msleep(20);
                 }
                 
-                
+               
 
             }
 
             break;
 
-        case 64:
-
-            for (int i = 0; i < 4; i++) {
-                gpio_direction_output(led[i], LOW);
+        case 63:
+            if (mode != 3) {
+                reset_mode(3);
             }
-            mode = 3;
-
+            
             break;
     }
     return IRQ_HANDLED;
+}
+
+static ssize_t led_switch_write(struct file *file, const char __user *buf, size_t len, loff_t *offset) {
+    char user_input
+    int input_i = (int)user_input;
+
+
+
+    if (copy_from_user(&user_input, buf, 1)) {
+        return -EFAULT;
+    }
+
+    switch (user_input) {
+        case '0' :
+            reset_mode(5);
+            break;
+        
+        case '1' :
+            timer_setup(&timer, timer_cb_sw0, 0);
+            timer.expires = jiffies + HZ * 2;
+            add_timer(&timer);
+            mode = 0;
+
+            break;
+        
+        case '2' :
+            timer_setup(&timer, timer_cb_sw1, 0);
+            timer.expires = jiffies + HZ * 2;
+            add_timer(&timer);
+            mode = 1;
+
+            break;
+
+        case '3' :
+            while (1) {
+                msleep(20);
+                for (i = 0; i < 4; i++) {
+                    if(i == input_i) {
+                        if(i == 3) {
+                            reset_mode(3);
+                            return IRQ_HANDLED;
+                        }
+                        led_state[i] ^= 1;
+                        gpio_direction_output(led[i], led_state[i] ? HIGH : LOW);
+                        printk(KERN_INFO "press\n");
+                        }
+                }
+
+                    msleep(20);
+            }
+            break;
+
+        case '4' :
+            break;
+
+
+
+    }
+
+
+    return len;
+
 }
 
 static struct file_operations fops = {
@@ -169,116 +227,12 @@ static struct file_operations fops = {
     .write = led_switch_write,
 };
 
-// write 함수 구현
-ssize_t led_switch_write(struct file *filp, const char __user *buffer, size_t len, loff_t *offset) {
-    char kbuf[16]; // 커널 공간 버퍼
-    unsigned long value;
-    static int led_state[4] = {0};
-
-    // 사용자 공간에서 커널 공간으로 데이터 복사
-    if (copy_from_user(kbuf, buffer, len)) {
-        return -EFAULT; // 오류 발생 시
-    }
-
-    kbuf[len] = '\0'; // 널 종료
-    if (kstrtoul(kbuf, 10, &value) != 0) {
-        return -EINVAL; // 변환 오류
-    }
-
-    // LED 상태 제어
-    switch (value) {
-        case 0:
-            if (mode == 0) {
-                break;
-            }
-            if (mode != 3) {
-                timer_setup(&timer, timer_cb_sw0, 0);
-                timer.expires = jiffies + HZ * 2;
-                add_timer(&timer);
-                mode = 0;
-                 
-            }
-            break;
-            
-        case 1:
-            if (mode == 1) {
-                break;
-            }
-            if (mode != 3) {
-                timer_setup(&timer, timer_cb_sw1, 0);
-                timer.expires = jiffies + HZ * 2;
-                add_timer(&timer);
-                mode = 1;
-                
-            }
-            break;
-            
-        case 2:
-            if (mode == 2) {
-                break;
-            }
-            
-            if (mode != 3) {
-
-                if (gpio_get_value(sw[0])) {
-                    led_state[0] ^= 1; 
-                    gpio_direction_output(led[0], led_state[0]);
-                }
-
-            
-                if (gpio_get_value(sw[1])) {
-                    led_state[1] ^= 1; 
-                    gpio_direction_output(led[1], led_state[1]);   
-                }
-
-                
-                if (gpio_get_value(sw[2])) {
-                    led_state[2] ^= 1; 
-                    gpio_direction_output(led[2], led_state[2]); 
-                }
-
-                
-                if (gpio_get_value(sw[3])) {
-                    for (int i = 0; i < 4; i++) {
-                        led_state[i] = 0;
-                        gpio_direction_output(led[i], LOW); 
-                    }
-                    mode = 3;
-                }
-                
-                
-
-            }
-
-            break;
-            
-        case 3:
-            for (int i = 0; i < 4; i++) {
-                gpio_direction_output(led[i], LOW);
-            }
-            mode = 3;
-
-            break;
-            
-            
-        default:
-            return -EINVAL;
-            
-    }
-
-    return len; // 성공적으로 처리된 바이트 수 반환
-}
-
-
 
 
 
 static int led_switch_init(void) {
     int res_sw, ret_led, i, ret;
-
     printk(KERN_INFO"led_switch_init!\n");
-
-    ret = register_chrdev(DEV_MAJOR_NUMBER, DEV_NAME, &fops);
 
     for(i = 0; i < 4; i++) {
         res_sw = gpio_request(sw[i], "sw");
@@ -292,6 +246,16 @@ static int led_switch_init(void) {
             printk(KERN_INFO "led_module gpio_request failed!\n");
     
     } 
+
+    ret = register_chrdev(DEV_MAJOR_NUMBER, DEVICE_NAME, &fops);
+
+    if (ret < 0) {
+        printk(KERN_INFO "Failed to register char device\n");
+        return ret;
+    }
+
+
+
     return 0;
 }
 
@@ -300,15 +264,16 @@ static void led_switch_exit(void) {
 
     printk(KERN_INFO "led_switch_exit\n");
 
-    unregister_chrdev(DEV_MAJOR_NUMBER, DEV_NAME);
-
-    del_timer(&timer);
+    del_timer_sync(&timer);
 
     for(i = 0; i < 4; i++) {
         gpio_free(led[i]);
         free_irq(gpio_to_irq(sw[i]), (void *)(irq_handler));
         gpio_free(sw[i]);
     }
+
+    unregister_chrdev(DEV_MAJOR_NUMBER, DEVICE_NAME);
+
 }
 
 module_init(led_switch_init);
