@@ -11,7 +11,8 @@
 
 int sw[4] = {4, 17, 27, 22};
 int led[4] = {23, 24, 25, 1};
-int mode = 3; // mode 0 ~ 3번까지 
+int mode = 5; // mode 0 ~ 3번까지 
+static int led_state[4] = {0};
 
 static struct timer_list timer;
 
@@ -38,17 +39,6 @@ static void timer_cb_sw0(struct timer_list * timer) {
 
 static void timer_cb_sw1(struct timer_list * timer) {
     
-
-    // int ret_led, i;
-    
-    // for(i = 0; i < 4; i++) {
-    //     ret_led = gpio_direction_output(led[i], HIGH);
-    //     timer->expires = jiffies + HZ * 2;
-    //     ret_led = gpio_direction_output(led[i], LOW);
-    //     add_timer(timer);
-    // }
-
-    
     static int current_led = 0;
     int ret_led;
 
@@ -67,20 +57,30 @@ static void timer_cb_sw1(struct timer_list * timer) {
 
 }
 
+static void reset_mode(int number) {
+    int i;
+    mode = number;
+    for(i = 0; i < 4; i++) {
+        gpio_direction_output(led[i], LOW);
+    }
+    printk(KERN_INFO "RESET_MODE");
+}
 
 
 
 irqreturn_t irq_handler(int irq, void*dev_id) {
     printk(KERN_INFO"Debug%d\n", irq);
-    int led_state[4] = {0};
+    
+    int i;
 
     switch(irq) {
-        case 61:
+        case 60:
 
             if (mode == 0) {
+                reset_mode(0);
                 break;
             }
-            if (mode != 3) {
+            if (mode != 2) {
                 timer_setup(&timer, timer_cb_sw0, 0);
                 timer.expires = jiffies + HZ * 2;
                 add_timer(&timer);
@@ -89,12 +89,13 @@ irqreturn_t irq_handler(int irq, void*dev_id) {
             }
             break;
 
-        case 62:
+        case 61:
 
             if (mode == 1) {
+                reset_mode(1);
                 break;
             }
-            if (mode != 3) {
+            if (mode != 2) {
                 timer_setup(&timer, timer_cb_sw1, 0);
                 timer.expires = jiffies + HZ * 2;
                 add_timer(&timer);
@@ -103,13 +104,14 @@ irqreturn_t irq_handler(int irq, void*dev_id) {
             }
             break;
 
-        case 63:
+        case 62:
 
             if (mode == 2) {
+                reset_mode(2);
                 break;
             }
             
-            if (mode != 3) {
+            if (mode != 2) {
 
                 if (gpio_get_value(sw[0])) {
                     led_state[0] ^= 1; 
@@ -130,7 +132,8 @@ irqreturn_t irq_handler(int irq, void*dev_id) {
 
                 
                 if (gpio_get_value(sw[3])) {
-                    for (int i = 0; i < 4; i++) {
+                    
+                    for (i = 0; i < 4; i++) {
                         led_state[i] = 0;
                         gpio_direction_output(led[i], LOW); 
                     }
@@ -143,13 +146,11 @@ irqreturn_t irq_handler(int irq, void*dev_id) {
 
             break;
 
-        case 64:
-
-            for (int i = 0; i < 4; i++) {
-                gpio_direction_output(led[i], LOW);
+        case 63:
+            if (mode != 3) {
+                reset_mode(3);
             }
-            mode = 3;
-
+            
             break;
     }
     return IRQ_HANDLED;
