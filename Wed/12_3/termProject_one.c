@@ -41,24 +41,29 @@ static void timer_cb_sw1(struct timer_list * timer) {
     
     static int current_led = 0;
     int ret_led;
+    int i;
 
-    timer->expires = jiffies + HZ * 2; 
-    add_timer(timer);
-
-    
-    ret_led = gpio_direction_output(led[current_led], HIGH);
-    printk(KERN_INFO "LED ON %d \n", current_led);
+    // ret_led = gpio_direction_output(led[current_led], HIGH);
+    // printk(KERN_INFO "LED ON %d led %d \n", current_led, ret_led);
 
     
-    timer->expires = jiffies + HZ * 2; 
-    add_timer(timer);
+    // timer->expires = jiffies + HZ * 2; 
+    // add_timer(timer);
     
     
-    ret_led = gpio_direction_output(led[current_led], LOW);
-    printk(KERN_INFO "LED OFF %d \n", current_led);
+    // ret_led = gpio_direction_output(led[current_led], LOW);
+    // printk(KERN_INFO "LED OFF %d led %d \n", current_led, ret_led);
 
     
+    // current_led = (current_led + 1) % 4;
+
+    for (i = 0; i < 4; i ++) {
+        ret_led = gpio_direction_output(led[i], current_led ? 1 : 0);
+    }
     current_led = (current_led + 1) % 4;
+
+    timer->expires = jiffies + HZ * 2;
+    add_timer(timer);
 
 }
 
@@ -102,6 +107,7 @@ irqreturn_t irq_handler(int irq, void*dev_id) {
                 break;
             }
             if (mode != 2) {
+                reset_mode(1);
                 timer_setup(&timer, timer_cb_sw1, 0);
                 timer.expires = jiffies + HZ * 2;
                 add_timer(&timer);
