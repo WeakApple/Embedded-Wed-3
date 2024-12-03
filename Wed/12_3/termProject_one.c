@@ -14,6 +14,7 @@ int sw[4] = {4, 17, 27, 22};
 int led[4] = {23, 24, 25, 1};
 int mode = 5; // mode 0 ~ 3번까지 
 static int led_state[4] = {0};
+static int current_led = 0;
 
 static struct timer_list timer;
 
@@ -44,21 +45,21 @@ static void timer_cb_sw0(struct timer_list * timer) {
 
 static void timer_cb_sw1(struct timer_list * timer) {
     
-    static int current_led = 0;
-    int ret_led;
-    int i;
-
-    ret_led = gpio_direction_output(led[current_led], HIGH);
-    printk(KERN_INFO "LED ON %d led state %d\n", current_led, ret_led);
-
-    timer->expires = jiffies + HZ;
-    add_timer(timer);
-
-    ret_led = gpio_direction_output(led[current_led], LOW);
-    printk(KERN_INFO "LED OFF %d led state %d\n", current_led, ret_led);
+    int ret_led, i;
 
     current_led = (current_led + 1) % 4;
 
+    ret_led = gpio_direction_output(led[current_led], LOW);
+
+    timer->expires = jiffies + HZ * 2;
+    add_timer(timer);
+
+    ret_led = gpio_direction_output(led[current_led], HIGH);
+
+    
+
+    
+  
 }
 
 static void reset_mode(int number) {
@@ -118,33 +119,46 @@ irqreturn_t irq_handler(int irq, void*dev_id) {
             
             if (mode != 2) {
 
-                if (gpio_get_value(sw[0])) {
-                    led_state[0] ^= 1; 
-                    gpio_direction_output(led[0], led_state[0]);
-                }
+                // if (gpio_get_value(sw[0])) {
+                //     led_state[0] ^= 1; 
+                //     gpio_direction_output(led[0], led_state[0]);
+                // }
 
             
-                if (gpio_get_value(sw[1])) {
-                    led_state[1] ^= 1; 
-                    gpio_direction_output(led[1], led_state[1]);   
-                }
+                // if (gpio_get_value(sw[1])) {
+                //     led_state[1] ^= 1; 
+                //     gpio_direction_output(led[1], led_state[1]);   
+                // }
 
                 
-                if (gpio_get_value(sw[2])) {
-                    led_state[2] ^= 1; 
-                    gpio_direction_output(led[2], led_state[2]); 
-                }
+                // if (gpio_get_value(sw[2])) {
+                //     led_state[2] ^= 1; 
+                //     gpio_direction_output(led[2], led_state[2]); 
+                // }
 
                 
-                if (gpio_get_value(sw[3])) {
+                // if (gpio_get_value(sw[3])) {
                     
-                    for (i = 0; i < 4; i++) {
-                        led_state[i] = 0;
-                        gpio_direction_output(led[i], LOW); 
-                    }
-                    mode = 3;
-                }
+                //     for (i = 0; i < 4; i++) {
+                //         led_state[i] = 0;
+                //         gpio_direction_output(led[i], LOW); 
+                //     }
+                //     mode = 3;
+                // }
                 
+                for (i = 0; i < 4; i++) {
+                    if (gpio_get_value(sw[i])) {
+
+                        if (gpio_get_value(sw[3])) {
+                            reset_mode(3);
+                            break;
+                        }    
+
+                        led_state[i] ^= 1;
+                        gpio_direction_output(led[i], led_state[i] ? HIGH : LOW);
+                        printk(KERN_INFO "sw[%d] press, led[%d]\n", i, led_state[i]);
+                    }
+                }
                 
 
             }
