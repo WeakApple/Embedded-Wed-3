@@ -161,14 +161,15 @@ irqreturn_t irq_handler(int irq, void*dev_id) {
 }
 
 static ssize_t led_switch_write(struct file *file, const char __user *buf, size_t len, loff_t *offset) {
-    char user_input
-    int input_i = (int)user_input;
+    char user_input;
 
 
 
     if (copy_from_user(&user_input, buf, 1)) {
         return -EFAULT;
     }
+
+    int input_i = (int)user_input;
 
     switch (user_input) {
         case '0' :
