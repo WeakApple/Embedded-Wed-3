@@ -5,6 +5,7 @@
 #include <linux/delay.h>
 #include <linux/gpio.h>
 #include <linux/timer.h>
+#include <linux/delay.h>
 
 
 #define HIGH    1
@@ -118,34 +119,12 @@ irqreturn_t irq_handler(int irq, void*dev_id) {
             
             if (mode != 2) {
                 mode = 2;
-                // if (gpio_get_value(sw[0])) {
-                //     led_state[0] ^= 1; 
-                //     gpio_direction_output(led[0], led_state[0]);
-                // }
-
-            
-                // if (gpio_get_value(sw[1])) {
-                //     led_state[1] ^= 1; 
-                //     gpio_direction_output(led[1], led_state[1]);   
-                // }
-
-                
-                // if (gpio_get_value(sw[2])) {
-                //     led_state[2] ^= 1; 
-                //     gpio_direction_output(led[2], led_state[2]); 
-                // }
-
-                
-                // if (gpio_get_value(sw[3])) {
-                //     reset_mode(2);
-                // }
-
                 while (1) {
                     for (i = 0; i < 4; i++) {
                         if(gpio_get_value(sw[i])) {
-                            if(gpio_get_value(sw[3])) {
+                            if(i == 3) {
                                 reset_mode(3);
-                                break;
+                                return IRQ_HANDLED;
                             }
                             led_state[i] ^= 1;
                             gpio_direction_output(led[i], led_state[i] ? HIGH : LOW);
@@ -154,6 +133,8 @@ irqreturn_t irq_handler(int irq, void*dev_id) {
 
                         }
                     }
+
+                    msleep(200);
                 }
                 
                
