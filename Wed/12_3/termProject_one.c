@@ -17,7 +17,7 @@ static int led_state[4] = {0};
 static struct timer_list timer;
 
 static void timer_cb_sw0(struct timer_list * timer) {
-    int flag = 0;
+    static int flag = 0;
     int ret_led, i;
 
     if (flag == 0) {
@@ -42,8 +42,12 @@ static void timer_cb_sw1(struct timer_list * timer) {
     static int current_led = 0;
     int ret_led;
 
+    timer->expires = jiffies + HZ * 2; 
+    add_timer(timer);
+
     
     ret_led = gpio_direction_output(led[current_led], HIGH);
+    printk(KERN_INFO "LED ON %d \n", current_led);
 
     
     timer->expires = jiffies + HZ * 2; 
@@ -51,6 +55,7 @@ static void timer_cb_sw1(struct timer_list * timer) {
     
     
     ret_led = gpio_direction_output(led[current_led], LOW);
+    printk(KERN_INFO "LED OFF %d \n", current_led);
 
     
     current_led = (current_led + 1) % 4;
@@ -60,6 +65,7 @@ static void timer_cb_sw1(struct timer_list * timer) {
 static void reset_mode(int number) {
     int i;
     mode = number;
+    del_timer_sync(&timer);
     for(i = 0; i < 4; i++) {
         gpio_direction_output(led[i], LOW);
     }
