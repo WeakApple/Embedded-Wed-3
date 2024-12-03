@@ -59,11 +59,12 @@ static void timer_cb_sw1(struct timer_list * timer) {
 
     for (i = 0; i < 4; i ++) {
         ret_led = gpio_direction_output(led[i], current_led ? 1 : 0);
+        timer->expires = jiffies + HZ * 2;
+        add_timer(timer);
     }
     current_led = (current_led + 1) % 4;
 
-    timer->expires = jiffies + HZ * 2;
-    add_timer(timer);
+    
 
 }
 
