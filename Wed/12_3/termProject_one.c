@@ -120,6 +120,7 @@ irqreturn_t irq_handler(int irq, void*dev_id) {
             if (mode != 2) {
                 mode = 2;
                 while (1) {
+                    msleep(20);
                     for (i = 0; i < 4; i++) {
                         if(gpio_get_value(sw[i])) {
                             if(i == 3) {
@@ -134,7 +135,7 @@ irqreturn_t irq_handler(int irq, void*dev_id) {
                         }
                     }
 
-                    msleep(200);
+                    msleep(20);
                 }
                 
                
