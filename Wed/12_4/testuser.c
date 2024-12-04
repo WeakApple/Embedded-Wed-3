@@ -8,6 +8,7 @@
 int main() {
     int fd;
     char input;
+    char insert_input;
 
     fd = open(DEVICE_PATH, O_WRONLY);
     if (fd < 0) {
@@ -18,6 +19,8 @@ int main() {
     while (1) {
         printf("Enter mode (0: Reset, 1: All, 2: Individual, 3: Manual, 4: Exit): ");
         scanf(" %c", &input);
+
+        
 
         if (input == '4') {
             close(fd);
@@ -30,8 +33,8 @@ int main() {
                     break;
                 }
                 printf("insert date : ");
-                scanf("%c", &input);
-                printf("\n");
+                scanf(" %c", &input);
+
 
 
 
