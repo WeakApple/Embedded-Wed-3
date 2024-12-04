@@ -57,7 +57,6 @@ static void timer_cb_sw1(struct timer_list * timer) {
     ret_led = gpio_direction_output(led[current_led], LOW);
     
     
-    printk(KERN_INFO "LED OFF %d", current_led);
 
     current_led = (current_led + 1) % 4;
 
@@ -65,17 +64,16 @@ static void timer_cb_sw1(struct timer_list * timer) {
     add_timer(timer);
 
     ret_led = gpio_direction_output(led[current_led], HIGH);
-    printk(KERN_INFO "LED ON %d", current_led);
 }
 
 static void reset_mode(int number) {
     int i;
-    mode = 5;
     del_timer_sync(&timer);
     for(i = 0; i < 4; i++) {
         gpio_direction_output(led[i], LOW);
     }
     printk(KERN_INFO "RESET_MODE");
+    current_led = 3;
 }
 
 
@@ -92,7 +90,8 @@ static ssize_t led_switch_write(struct file *file, const char __user *buf, size_
         return -EFAULT;
     }
 
-    input_i = (int)user_input;
+    input_i = user_input - '0';
+    
 
     switch (user_input) {
         case '0' :
@@ -118,23 +117,27 @@ static ssize_t led_switch_write(struct file *file, const char __user *buf, size_
             break;
 
         case '3' :
-            while (1) {
 
+            printk(KERN_INFO "input case %d\n", input_i);
+
+            while (1) {
                 if(input_i >= 0 && input_i < 4) {
                     led_state[input_i] ^= 1;
                     gpio_direction_output(led[input_i], led_state[input_i] ? HIGH : LOW);
+                    
+                    printk(KERN_INFO "input %d\n", input_i);
 
                 }
 
-                if (input_i == 3) {
+                if (input_i == 4) {
                     reset_mode(0);
                     return len;
                 }
-
-
-
-
             }
+
+
+
+            
             break;
 
         case '4' :
