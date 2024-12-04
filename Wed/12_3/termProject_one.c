@@ -21,7 +21,6 @@ static struct timer_list timer;
 
 // 전체 모드
 static void timer_cb_sw0(struct timer_list * timer) {
-    static int flag = 0;
     int ret_led, i;
     for(i = 0; i < 4; i++) {
         ret_led = gpio_direction_output(led[i], led_state[0]);
@@ -88,26 +87,26 @@ irqreturn_t irq_handler(int irq, void*dev_id) {
     switch(irq) {
         case 60:
             //led가 켜진 상태에서 시작하기 위한 초기설정
+            if (mode == 2) {          
+                sudong_mode(0);
+                break;
+            }
             reset_mode(0);
             led_state[0] = HIGH;
-            
             timer_setup(&timer, timer_cb_sw0, 0);
             timer.expires = jiffies;
             add_timer(&timer);
-            if (mode == 2) {          
-                sudong_mode(0);
-            }
             break;
 
         case 61:
-            
+            if (mode == 2) {          
+                sudong_mode(1);
+                break;
+            }
             reset_mode(1);
             timer_setup(&timer, timer_cb_sw1, 0);
             timer.expires = jiffies + HZ * 2;
             add_timer(&timer);
-            if (mode == 2) {          
-                sudong_mode(1);
-            }
             break;
 
         case 62:
