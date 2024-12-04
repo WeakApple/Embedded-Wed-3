@@ -19,31 +19,19 @@ static int current_led = 3;
 
 static struct timer_list timer;
 
+// 전체 모드
 static void timer_cb_sw0(struct timer_list * timer) {
     static int flag = 0;
     int ret_led, i;
-
-    if (flag == 0) {
-        for(i = 0; i < 4; i++) {
-            ret_led = gpio_direction_output(led[i], HIGH);
-        }
-        flag = 1;
-        
-        
-        } else {
-        for(i = 0; i < 4; i++) {
-            ret_led = gpio_direction_output(led[i], LOW);
-        }
-        flag = 0;
-        
-        
+    for(i = 0; i < 4; i++) {
+        ret_led = gpio_direction_output(led[i], led_state[0]);
     }
-
+    led_state[0] ^= 1;
     timer->expires = jiffies + HZ * 2;
     add_timer(timer);
 
 }
-
+// 개별 모드
 static void timer_cb_sw1(struct timer_list * timer) {
     
     int ret_led;
@@ -62,18 +50,36 @@ static void timer_cb_sw1(struct timer_list * timer) {
     printk(KERN_INFO "LED ON %d", current_led);
 }
 
+
+
+
+// 초기화
 static void reset_mode(int number) {
     int i;
-    mode = 5;
+    int sig;
+    mode = number;
     del_timer_sync(&timer);
     for(i = 0; i < 4; i++) {
         gpio_direction_output(led[i], LOW);
+        led_state[i] = LOW;
     }
     printk(KERN_INFO "RESET_MODE");
+    current_led = 3;
 }
 
+// 수동모드 내부 로직
+static void sudong_mode(int sw_num) {
 
+    if(sw_num == 3) {
+        reset_mode(3);
+        return IRQ_HANDLED;
+    }
+    led_state[sw_num] ^= 1;
+    gpio_direction_output(led[sw_num], led_state[sw_num] ? HIGH : LOW);
+    printk(KERN_INFO "press\n");
+}
 
+// 인터럽트 핸들러(스위치)
 irqreturn_t irq_handler(int irq, void*dev_id) {
     printk(KERN_INFO"Debug%d\n", irq);
     
@@ -81,79 +87,46 @@ irqreturn_t irq_handler(int irq, void*dev_id) {
 
     switch(irq) {
         case 60:
-
-            if (mode == 0) {
-                reset_mode(0);
-                break;
-            }
-            if (mode != 2) {
-                timer_setup(&timer, timer_cb_sw0, 0);
-                timer.expires = jiffies + HZ * 2;
-                add_timer(&timer);
-                mode = 0;
-                 
+            //led가 켜진 상태에서 시작하기 위한 초기설정
+            reset_mode(0);
+            led_state[0] = HIGH;
+            
+            timer_setup(&timer, timer_cb_sw0, 0);
+            timer.expires = jiffies;
+            add_timer(&timer);
+            if (mode == 2) {          
+                sudong_mode(0);
             }
             break;
 
         case 61:
-
-            if (mode == 1) {
-                reset_mode(1);
-                break;
-            }
-            if (mode != 2) {
-                timer_setup(&timer, timer_cb_sw1, 0);
-                timer.expires = jiffies + HZ * 2;
-                add_timer(&timer);
-                mode = 1;
-                
+            
+            reset_mode(1);
+            timer_setup(&timer, timer_cb_sw1, 0);
+            timer.expires = jiffies + HZ * 2;
+            add_timer(&timer);
+            if (mode == 2) {          
+                sudong_mode(1);
             }
             break;
 
         case 62:
-
-            if (mode == 2) {
+            if (mode != 2) {
                 reset_mode(2);
                 break;
             }
-            
-            if (mode != 2) {
-                mode = 2;
-                while (1) {
-                    msleep(20);
-                    for (i = 0; i < 4; i++) {
-                        if(gpio_get_value(sw[i])) {
-                            if(i == 3) {
-                                reset_mode(3);
-                                return IRQ_HANDLED;
-                            }
-                            led_state[i] ^= 1;
-                            gpio_direction_output(led[i], led_state[i] ? HIGH : LOW);
-                            printk(KERN_INFO "press\n");
-
-
-                        }
-                    }
-
-                    msleep(20);
-                }
-                
-               
-
-            }
-
+            sudong_mode(2);
             break;
 
         case 63:
             if (mode != 3) {
                 reset_mode(3);
             }
-            
             break;
     }
     return IRQ_HANDLED;
 }
-
+// 모듈 초기화
 static int led_switch_init(void) {
     int res_sw, ret_led, i;
     printk(KERN_INFO"led_switch_init!\n");
@@ -172,7 +145,7 @@ static int led_switch_init(void) {
     } 
     return 0;
 }
-
+// 모듈 삭제
 static void led_switch_exit(void) {
     int i;
 
