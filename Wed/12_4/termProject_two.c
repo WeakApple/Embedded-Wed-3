@@ -93,6 +93,7 @@ static ssize_t led_switch_write(struct file *file, const char __user *buf, size_
     input_i = user_input - '0';
     
 
+
     switch (user_input) {
         case '0' :
             reset_mode(5);
@@ -112,7 +113,6 @@ static ssize_t led_switch_write(struct file *file, const char __user *buf, size_
             timer_setup(&timer, timer_cb_sw1, 0);
             timer.expires = jiffies + HZ * 2;
             add_timer(&timer);
-           
 
             break;
 
@@ -120,17 +120,16 @@ static ssize_t led_switch_write(struct file *file, const char __user *buf, size_
 
             printk(KERN_INFO "input case %d\n", input_i);
 
-            while (1) {
-                if(input_i >= 0 && input_i < 4) {
-                    led_state[input_i] ^= 1;
-                    gpio_direction_output(led[input_i], led_state[input_i] ? HIGH : LOW);
-                    
-                    printk(KERN_INFO "input %d\n", input_i);
-
-                }
+            
+            if(input_i >= 0 && input_i < 4) {
+                led_state[input_i] ^= 1;
+                gpio_direction_output(led[input_i], led_state[input_i] ? HIGH : LOW);
+                
+                printk(KERN_INFO "input %d\n", input_i);
 
                 if (input_i == 4) {
                     reset_mode(0);
+                    printk(KERN_INFO "reset\n");
                     return len;
                 }
             }
@@ -141,6 +140,7 @@ static ssize_t led_switch_write(struct file *file, const char __user *buf, size_
             break;
 
         case '4' :
+            reset_mode(1);
             break;
 
     }
