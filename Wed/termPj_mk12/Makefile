@@ -1,5 +1,5 @@
 CC = gcc
-obj-m := termProject_one.o
+obj-m := embedded_device.o
 KDIR:= /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
 default :
