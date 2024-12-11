@@ -85,7 +85,7 @@ static void reset_mode(int number) {
 static void manual_mode(int sw_num) {
     // 입력 받은 sw 번호와 맵핑되는 led의 상태를 반전
     led_state[sw_num] ^= 1;
-    gpio_direction_output(led[sw_num], led_state[sw_num]); //? HIGH : LOW)
+    gpio_direction_output(led[sw_num], led_state[sw_num]);
 
 }
 
@@ -141,9 +141,14 @@ static ssize_t embedded_device_write(struct file *file, const char __user *buf, 
     // 사용자 입력을 기반으로 분기
     switch (user_input) {
         // 전체 모드
+        case '0' :
+        if (mode == 2) {          
+                manual_mode(0);
+                break;
+            }
         case '1' :
             if (mode == 2) {          
-                manual_mode(0);
+                manual_mode(1);
                 break;
             }
             reset_mode(0);
@@ -153,7 +158,7 @@ static ssize_t embedded_device_write(struct file *file, const char __user *buf, 
         // 개별 모드
         case '2' :
             if (mode == 2) {          
-                manual_mode(1);
+                manual_mode(2);
                 break;
             }
             reset_mode(1);
@@ -165,7 +170,7 @@ static ssize_t embedded_device_write(struct file *file, const char __user *buf, 
                 reset_mode(2);
                 break;
             }
-            manual_mode(2);
+            manual_mode(3);
             break;
         // 모드 초기화
         case '4' :
@@ -173,10 +178,7 @@ static ssize_t embedded_device_write(struct file *file, const char __user *buf, 
             break;
 
     }
-
-
     return len;
-
 }
 
 // 맵핑 테이블

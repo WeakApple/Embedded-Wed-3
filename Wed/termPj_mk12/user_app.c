@@ -33,7 +33,11 @@ int main() {
             continue;
         }
         // 입력값 유효성 검사 2
-        if (user_input > 5 || user_input < 1){
+        if (user_input > 5 || user_input < 0){
+            continue;
+        }
+        //입력값 유효성 검사 3
+        if (mode == 1 and user_input == 0){
             continue;
         }
         // 사용자 프로그램 종료 조건 설정
